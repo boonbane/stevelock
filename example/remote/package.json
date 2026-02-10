@@ -1,0 +1,13 @@
+{
+  "name": "stevelock-remote-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "block": "bun run host.ts",
+    "clean": "rm -rf ./node_modules ./bun.lock",
+    "remote": "bun run clean && bun install && bun run block"
+  },
+  "dependencies": {
+    "stevelock": "*"
+  }
+}

@@ -1,0 +1,14 @@
+# Rules
+- Always use native Bun APIs where applicable
+- Always export and import a single, top-level namespace instead of loose symbols
+- Always `import path from "path"` instead of `import { whatever } from "path"`; same for `fs` and other Bun modules
+- Prefer single word variable names
+- Avoid using functions to organize code; instead, prefer to keep code in one function unless you need reuse
+- Avoid `try` and `catch`; instead, prefer to return error codes
+- Avoid `else` statements
+- Avoid using `any`
+- Avoid `let` statements
+- Never write scripts with loose code; always put `main()` into a function and invoke it
+- Never use `/tmp`; prefer `.cache/scratch`. Out-of-tree directory access forces manual approval, `.cache/scratch` lets you work autonomously
+- Never write utilities as Bash scripts; always use TypeScript + Bun
+- Never wrap `await foo()` in parentheses in an if statement

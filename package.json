@@ -1,0 +1,39 @@
+{
+  "name": "stevelock",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "files": [
+    "src",
+    "CMakeLists.txt"
+  ],
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "bin": {
+    "stevelock": "src/cli.ts"
+  },
+  "scripts": {
+    "clean": "bun run tools/release.ts clean",
+    "build": "bun run tools/release.ts build",
+    "package": "bun run tools/release.ts package",
+    "publish": "bun run tools/release.ts publish",
+    "example:local": "bun run build && bun run package && bun run --cwd ./example/local local",
+    "example:remote": "bun run --cwd ./example/remote remote",
+    "smoke": "bun run example:local"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "cmake-js": "^8.0.0",
+    "consola": "^3.4.2"
+  },
+  "dependencies": {
+    "yargs": "^18.0.0"
+  },
+  "optionalDependencies": {
+    "@stevelock/stevelock-darwin-arm64-apple": "0.1.0",
+    "@stevelock/stevelock-darwin-x64-apple": "0.1.0",
+    "@stevelock/stevelock-linux-arm64-gnu": "0.1.0",
+    "@stevelock/stevelock-linux-x64-gnu": "0.1.0"
+  }
+}

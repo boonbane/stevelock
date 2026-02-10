@@ -1,0 +1,15 @@
+.llm
+.cache
+build
+node_modules
+example/node_modules
+example/bun.lock
+example/local/node_modules
+example/local/bun.lock
+example/local/.cache
+example/remote/node_modules
+example/remote/bun.lock
+example/remote/.cache
+*.tgz
+packages/**/*.tgz
+packages/*/stevelock.node

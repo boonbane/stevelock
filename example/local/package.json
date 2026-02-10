@@ -1,0 +1,17 @@
+{
+  "name": "stevelock-standalone-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "block": "bun run host.ts",
+    "clean": "rm -rf ./node_modules ./bun.lock",
+    "local": "bun run clean && bun install && bun run block"
+  },
+  "dependencies": {
+    "stevelock": "*",
+    "@stevelock/stevelock-linux-x64-gnu": "file:../../.cache/store/@stevelock/stevelock-linux-x64-gnu/stevelock-linux-x64-gnu.tar.gz"
+  },
+  "overrides": {
+    "stevelock": "file:../../.cache/store/stevelock/stevelock.tar.gz"
+  }
+}
