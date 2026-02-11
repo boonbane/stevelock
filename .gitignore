@@ -13,3 +13,4 @@ example/remote/.cache
 *.tgz
 packages/**/*.tgz
 packages/*/stevelock.node
+/compile_commands.json

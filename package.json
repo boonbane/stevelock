@@ -18,6 +18,7 @@
     "build": "bun run tools/release.ts build",
     "package": "bun run tools/release.ts package",
     "publish": "bun run tools/release.ts publish",
+    "format:native": "bun run tools/format-native.ts",
     "example:local": "bun run build && bun run package && bun run --cwd ./example/local local",
     "example:remote": "bun run --cwd ./example/remote remote",
     "smoke": "bun run example:local"
