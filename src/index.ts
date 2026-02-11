@@ -3,39 +3,17 @@ import { Readable } from "stream";
 import { constants } from "os";
 import fs from "fs";
 import path from "path";
+import { Platform } from "./platform.js";
 
 const require = createRequire(import.meta.url);
 
-const plat = process.platform;
-const arch = process.arch;
+const target = Platform.detect();
+const triple = Platform.triple(target);
+const pkg = Platform.packageName(target);
 
-const pkg =
-  plat === "darwin" && arch === "arm64"
-    ? "@stevelock/stevelock-darwin-arm64-apple"
-    : plat === "darwin" && arch === "x64"
-      ? "@stevelock/stevelock-darwin-x64-apple"
-      : plat === "linux" && arch === "arm64"
-        ? "@stevelock/stevelock-linux-arm64-gnu"
-        : plat === "linux" && arch === "x64"
-          ? "@stevelock/stevelock-linux-x64-gnu"
-          : "";
-
-const triple =
-  plat === "darwin" && arch === "arm64"
-    ? "darwin-arm64-apple"
-    : plat === "darwin" && arch === "x64"
-      ? "darwin-x64-apple"
-      : plat === "linux" && arch === "arm64"
-        ? "linux-arm64-gnu"
-        : plat === "linux" && arch === "x64"
-          ? "linux-x64-gnu"
-          : "";
-
-const local = triple
-  ? path.join(import.meta.dir, "..", ".cache", "build", "native", triple, "Release", "stevelock.node")
-  : "";
-const prebuiltRoot = pkg ? path.join(import.meta.dir, "..", "node_modules", pkg, "stevelock.node") : "";
-const prebuiltHost = pkg ? path.join(import.meta.dir, "..", "..", pkg, "stevelock.node") : "";
+const local = path.join(import.meta.dir, "..", ".cache", "build", "native", triple, "Release", "stevelock.node");
+const prebuiltRoot = path.join(import.meta.dir, "..", "node_modules", pkg, "stevelock.node");
+const prebuiltHost = path.join(import.meta.dir, "..", "..", pkg, "stevelock.node");
 const prebuilt =
   prebuiltRoot && fs.existsSync(prebuiltRoot)
     ? prebuiltRoot
@@ -46,13 +24,19 @@ const prebuilt =
 const native = prebuilt && fs.existsSync(prebuilt) ? require(prebuilt) : require(local);
 
 export interface SandboxOpts {
-  /** directories the sandboxed process can write to */
-  writable: string[];
+  /** directories readable by the sandboxed process */
+  read?: string[];
+  /** directories writable by the sandboxed process */
+  write?: string[];
   /** allow network access (default: false) */
-  allowNet?: boolean;
-  /** additional readable paths */
-  readable?: string[];
+  network?: boolean;
 }
+
+const sandboxDefaults: Required<SandboxOpts> = {
+  read: [],
+  write: [],
+  network: false,
+};
 
 export interface Sandbox {
   /** spawn a process inside the sandbox */
@@ -77,12 +61,13 @@ export interface Sandbox {
   destroy(): void;
 }
 
-export function create(opts: SandboxOpts): Sandbox {
-  const handle = native.create({
-    writable: opts.writable,
-    allowNet: opts.allowNet ?? false,
-    readable: opts.readable ?? [],
-  });
+export function create(opts: SandboxOpts = {}): Sandbox {
+  const cfg: Required<SandboxOpts> = {
+    ...sandboxDefaults,
+    ...opts,
+  };
+
+  const handle = native.create(cfg);
 
   let destroyed = false;
 
@@ -107,57 +92,60 @@ export function create(opts: SandboxOpts): Sandbox {
       return native.stderrFd(handle);
     },
 
-    stdout(): Readable {
-      const fd = native.stdoutFd(handle);
-      if (fd < 0) throw new Error("not spawned");
-      return Readable.fromWeb(
-        new ReadableStream({
-          start(controller) {
-            const file = Bun.file(fd);
-            const reader = file.stream().getReader();
-            (async () => {
-              try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  controller.enqueue(value);
-                }
-              } catch {
-                /* fd closed */
-              } finally {
-                controller.close();
-              }
-            })();
-          },
-        })
-      );
-    },
+    stdout(): Readable { return new Readable(); },
+    stderr(): Readable { return new Readable(); },
 
-    stderr(): Readable {
-      const fd = native.stderrFd(handle);
-      if (fd < 0) throw new Error("not spawned");
-      return Readable.fromWeb(
-        new ReadableStream({
-          start(controller) {
-            const file = Bun.file(fd);
-            const reader = file.stream().getReader();
-            (async () => {
-              try {
-                while (true) {
-                  const { done, value } = await reader.read();
-                  if (done) break;
-                  controller.enqueue(value);
-                }
-              } catch {
-                /* fd closed */
-              } finally {
-                controller.close();
-              }
-            })();
-          },
-        })
-      );
-    },
+    // stdout(): Readable {
+    //   const fd = native.stdoutFd(handle);
+    //   if (fd < 0) throw new Error("not spawned");
+    //   return Readable.fromWeb(
+    //     new ReadableStream({
+    //       start(controller) {
+    //         const file = Bun.file(fd);
+    //         const reader = file.stream().getReader();
+    //         (async () => {
+    //           try {
+    //             while (true) {
+    //               const { done, value } = await reader.read();
+    //               if (done) break;
+    //               controller.enqueue(value);
+    //             }
+    //           } catch {
+    //             /* fd closed */
+    //           } finally {
+    //             controller.close();
+    //           }
+    //         })();
+    //       },
+    //     })
+    //   );
+    // },
+
+    // stderr(): Readable {
+    //   const fd = native.stderrFd(handle);
+    //   if (fd < 0) throw new Error("not spawned");
+    //   return Readable.fromWeb(
+    //     new ReadableStream({
+    //       start(controller) {
+    //         const file = Bun.file(fd);
+    //         const reader = file.stream().getReader();
+    //         (async () => {
+    //           try {
+    //             while (true) {
+    //               const { done, value } = await reader.read();
+    //               if (done) break;
+    //               controller.enqueue(value);
+    //             }
+    //           } catch {
+    //             /* fd closed */
+    //           } finally {
+    //             controller.close();
+    //           }
+    //         })();
+    //       },
+    //     })
+    //   );
+    // },
 
     wait(): number {
       return native.wait(handle);

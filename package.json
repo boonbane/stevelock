@@ -15,20 +15,24 @@
   },
   "scripts": {
     "clean": "bun run tools/release.ts clean",
-    "build": "bun run tools/release.ts build",
-    "package": "bun run tools/release.ts package",
-    "publish": "bun run tools/release.ts publish",
-    "format:native": "bun run tools/format-native.ts",
-    "example:local": "bun run build && bun run package && bun run --cwd ./example/local local",
-    "example:remote": "bun run --cwd ./example/remote remote",
-    "smoke": "bun run example:local"
+    "build:addon": "bun run tools/release.ts build:addon",
+    "build:native": "bun run tools/release.ts build:native",
+    "test:addon": "bun run tools/release.ts test:addon",
+    "test:native": "bun run tools/release.ts test:native",
+    "test:native:asan": "bun run tools/release.ts test:native --asan",
+    "package:addon": "bun run tools/release.ts package:addon",
+    "package:js": "bun run tools/release.ts package:js",
+    "publish": "bun run tools/publish.ts",
+    "format": "bun run tools/format.ts",
+    "smoke": "bun run example:local",
+    "example:local": "bun run build:addon && bun run package:addon && bun run package:js && bun run --cwd ./example/local local",
+    "example:remote": "bun run --cwd ./example/remote remote"
   },
   "devDependencies": {
     "@types/bun": "^1.2.0",
+    "@types/yargs": "^17.0.35",
     "cmake-js": "^8.0.0",
-    "consola": "^3.4.2"
-  },
-  "dependencies": {
+    "consola": "^3.4.2",
     "yargs": "^18.0.0"
   },
   "optionalDependencies": {

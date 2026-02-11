@@ -19,7 +19,7 @@ const main = async () => {
     fs.rmSync(escape);
   }
 
-  const steve = stevelock.create({ writable: [jail] });
+  const steve = stevelock.create({ write: [jail] });
   steve.spawn(bun, ["run", script, jail, escape]);
 
   const code = steve.wait();

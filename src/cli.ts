@@ -32,7 +32,7 @@ const cmd = args[0].toString();
 const cmdPath = which(cmd) ?? cmd;
 const cmdArgs = args.slice(1).map(String);
 
-const lock = create({ writable: dirs, allowNet: argv.net as boolean });
+const lock = create({ write: dirs, network: argv.net as boolean });
 lock.spawn(cmdPath, cmdArgs);
 
 // stream stdout/stderr to parent
