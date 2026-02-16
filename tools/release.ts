@@ -35,6 +35,12 @@ const paths = {
       lib: path.join(root, ".cache", "store", "native", "lib"),
       include: path.join(root, ".cache", "store", "native", "include"),
     },
+    release: {
+      dir: path.join(root, ".cache", "store", "release"),
+      native: (target: Platform.Target) =>
+        path.join(root, ".cache", "store", "release", `stevelock-native-${Platform.triple(target)}.tar.gz`),
+      header: path.join(root, ".cache", "store", "release", "stevelock-header.tar.gz"),
+    },
     tar: {
       dir: path.join(root, ".cache", "store", "stevelock"),
       js: path.join(root, ".cache", "store", "stevelock", "stevelock.tar.gz"),
@@ -95,6 +101,19 @@ const packTarball = async (cwd: string): Promise<string> => {
     throw new Error(`failed to pack tarball in ${paths.cache.npm}`);
   }
   return path.join(paths.cache.npm, sorted[0].entry);
+};
+
+const packArchive = (cwd: string, out: string, entries: string[]) => {
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  rm(out);
+
+  const result = Bun.spawnSync(["tar", "-czf", out, ...entries], {
+    cwd,
+    stdio: ["inherit", "inherit", "inherit"],
+  });
+  if (!result.success) {
+    throw new Error(`tar exited with code ${result.exitCode}`);
+  }
 };
 
 const clean = () => {
@@ -221,6 +240,28 @@ const packageJs = async (value?: string) => {
   console.log(`stored wrapper tarball -> ${paths.store.tar.js}`);
 };
 
+const packageNative = () => {
+  const target = Platform.detect();
+  const triple = Platform.triple(target);
+  const lib = path.join(paths.store.native.lib, "libstevelock.a");
+  if (!fs.existsSync(lib)) {
+    throw new Error(`missing native library: ${lib}. run \`bun run build:native\` first`);
+  }
+
+  packArchive(paths.store.native.root, paths.store.release.native(target), ["lib/libstevelock.a"]);
+  console.log(`stored native release tarball (${triple}) -> ${paths.store.release.native(target)}`);
+};
+
+const packageHeader = () => {
+  const header = path.join(paths.store.native.include, "stevelock.h");
+  if (!fs.existsSync(header)) {
+    throw new Error(`missing header: ${header}. run \`bun run build:native\` first`);
+  }
+
+  packArchive(paths.store.native.root, paths.store.release.header, ["include/stevelock.h"]);
+  console.log(`stored header release tarball -> ${paths.store.release.header}`);
+};
+
 const smoke = async () => {
   const target = Platform.detect();
   buildAddon(target);
@@ -246,6 +287,8 @@ const main = async () => {
     .command("package:js", "package js wrapper tarball", {
       version: { type: "string" },
     })
+    .command("package:native", "package host native static library for GitHub release")
+    .command("package:header", "package stevelock.h for GitHub release")
     .command("smoke", "build, package current version, and run local example")
     .demandCommand(1)
     .strict()
@@ -288,6 +331,16 @@ const main = async () => {
 
   if (command === "package:js") {
     await packageJs((argv as Record<string, unknown>).version as string | undefined);
+    return;
+  }
+
+  if (command === "package:native") {
+    packageNative();
+    return;
+  }
+
+  if (command === "package:header") {
+    packageHeader();
     return;
   }
 
