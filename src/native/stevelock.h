@@ -459,6 +459,20 @@ void sl_pipes_try_close(sl_pipes_t* pipes) {
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifndef LANDLOCK_ACCESS_FS_REFER
+#define LANDLOCK_ACCESS_FS_REFER 0
+#endif
+
+#ifndef LANDLOCK_ACCESS_FS_TRUNCATE
+#define LANDLOCK_ACCESS_FS_TRUNCATE 0
+#endif
+
+#if defined(LANDLOCK_ACCESS_NET_BIND_TCP) && defined(LANDLOCK_ACCESS_NET_CONNECT_TCP)
+#define SL_HAS_LANDLOCK_NET 1
+#else
+#define SL_HAS_LANDLOCK_NET 0
+#endif
+
 static inline int landlock_create_ruleset(const struct landlock_ruleset_attr* attr, u64 size, u32 flags) {
   return (int)syscall(__NR_landlock_create_ruleset, attr, size, flags);
 }
@@ -544,15 +558,19 @@ static sl_err_t build_ruleset(sl_ctx_t* sb, s32* out_fd) {
 
   struct landlock_ruleset_attr attr = {
     .handled_access_fs = mask,
+#if SL_HAS_LANDLOCK_NET
     .handled_access_net = 0,
+#endif
   };
 
   /* If network is denied, handle TCP bind+connect so they're blocked
    * unless we add explicit allow rules (which we won't). */
   int abi = landlock_create_ruleset(NULL, 0, LANDLOCK_CREATE_RULESET_VERSION);
+#if SL_HAS_LANDLOCK_NET
   if (!sb->network && abi >= 4) {
     attr.handled_access_net = LANDLOCK_ACCESS_NET_BIND_TCP | LANDLOCK_ACCESS_NET_CONNECT_TCP;
   }
+#endif
 
   s32 ruleset_fd = landlock_create_ruleset(&attr, sizeof(attr), 0);
   if (ruleset_fd < 0) {
