@@ -1,4 +1,5 @@
 #define SP_IMPLEMENTATION
+#define STEVELOCK_IMPLEMENTATION
 #include "sl.h"
 
 UTEST_F(stevelock, wait_behavior) {

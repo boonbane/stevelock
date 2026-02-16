@@ -96,10 +96,6 @@
   } while (0)
 #endif
 
-#ifdef __cplusplus
-#define SL_CPP
-#endif
-
 #define sl_for(it, n) for (u32 it = 0; it < n; it++)
 #define sl_for_range(it, low, high) for (u32 it = (low); it < (high); it++)
 
@@ -181,6 +177,7 @@ typedef struct {
 #define sl_alloc_t(t) sl_alloc_n(t, 1)
 
 void* sl_allocator_alloc(sl_allocator_t allocator, u64 size);
+void* sl_allocator_realloc(sl_allocator_t allocator, void* ptr, u64 size);
 void  sl_allocator_free(sl_allocator_t allocator, void* ptr);
 void* sl_malloc_allocator(void* user_data, sl_alloc_mode_t mode, u64 size, void* ptr);
 void* sl_alloc(u64 size);
@@ -254,9 +251,6 @@ int       sb_kill(sl_ctx_t* sb, int sig);
 void      sb_destroy(sl_ctx_t* sb);
 const c8* sb_error(const sl_ctx_t* sb);
 
-
-
-#define STEVELOCK_IMPLEMENTATION
 #ifdef STEVELOCK_IMPLEMENTATION
 
 sl_runtime_t sl_rt = {
@@ -329,6 +323,10 @@ const c8* sl_err_to_string(sl_err_t err) {
 
 void* sl_allocator_alloc(sl_allocator_t allocator, u64 size) {
   return allocator.on_alloc(allocator.user_data, SL_ALLOC_MODE_ALLOC, size, SL_NULLPTR);
+}
+
+void* sl_allocator_realloc(sl_allocator_t allocator, void* ptr, u64 size) {
+  return allocator.on_alloc(allocator.user_data, SL_ALLOC_MODE_REALLOC, size, ptr);
 }
 
 void sl_allocator_free(sl_allocator_t allocator, void* ptr) {
@@ -626,9 +624,21 @@ sl_ctx_t* sb_create(const sb_opts_t* opts) {
     .stderr_fd = -1,
     .write = {.dirs = sl_alloc_n(c8*, opts->write.num_dirs), .num_dirs = opts->write.num_dirs},
     .read = {.dirs = sl_alloc_n(c8*, opts->read.num_dirs), .num_dirs = opts->read.num_dirs},
+    .network = opts->network,
+    .platform = {
+      .abi = abi,
+    },
   };
-  if (sl->write.num_dirs && !sl->write.dirs) return SL_NULLPTR;
-  if (sl->read.num_dirs && !sl->read.dirs) return SL_NULLPTR;
+  if (sl->write.num_dirs && !sl->write.dirs) {
+    sl_free((void*)sl->read.dirs);
+    sl_free(sl);
+    return SL_NULLPTR;
+  }
+  if (sl->read.num_dirs && !sl->read.dirs) {
+    sl_free((void*)sl->write.dirs);
+    sl_free(sl);
+    return SL_NULLPTR;
+  }
 
   sl_for(it, sl->write.num_dirs) {
     sl->write.dirs[it] = sl_cstr_copy(opts->write.dirs[it]);
@@ -646,8 +656,6 @@ sl_ctx_t* sb_create(const sb_opts_t* opts) {
     }
   }
 
-  sl->network = opts->network;
-
   return sl;
 }
 
@@ -655,18 +663,19 @@ sl_err_t sb_spawn(sl_ctx_t* sb, const c8* cmd, const c8* const* args, u32 num_ar
   if (!sb) return SL_ERROR_INVALID_CONTEXT;
   if (!cmd) return SL_ERROR_INVALID_COMMAND;
   if (num_args && !args) return SL_ERROR_INVALID_COMMAND;
+  if (sb->pid != -1) {
+    snprintf(sb->error, sizeof(sb->error), "already spawned");
+    return SL_ERROR;
+  }
 
   sp_try(sl_validate_ctx_scopes(sb));
 
   s32 ruleset = SL_ZERO;
-  sl_err_t build_err = build_ruleset(sb, &ruleset);
-  if (build_err == SL_ERROR_RULESET_CREATE || build_err == SL_ERROR_RULESET_ADD) {
-    return SL_ERROR;
-  }
-  sp_try(build_err);
+  sp_try(build_ruleset(sb, &ruleset));
 
   sl_pipes_t pipes = SL_NULL_PIPES;
   if (pipe(pipes.in) || pipe(pipes.out) || pipe(pipes.err)) {
+    snprintf(sb->error, sizeof(sb->error), "pipe: %s", strerror(errno));
     sl_pipes_try_close(&pipes);
     close(ruleset);
     return SL_ERROR_PIPE;
@@ -674,6 +683,7 @@ sl_err_t sb_spawn(sl_ctx_t* sb, const c8* cmd, const c8* const* args, u32 num_ar
 
   const c8** argv = sl_alloc_n(const c8*, num_args + 2);
   if (!argv) {
+    snprintf(sb->error, sizeof(sb->error), "alloc argv failed");
     sl_pipes_try_close(&pipes);
     close(ruleset);
     return SL_ERROR;
@@ -734,6 +744,7 @@ sl_err_t sb_spawn(sl_ctx_t* sb, const c8* cmd, const c8* const* args, u32 num_ar
   sl_pipes_try_close(&pipes);
   close(ruleset);
   sl_free((void*)argv);
+  snprintf(sb->error, sizeof(sb->error), "fork: %s", strerror(errno));
   return SL_ERROR_FORK;
 }
 
@@ -788,9 +799,9 @@ void sb_destroy(sl_ctx_t* sb) {
   sl_free(sb);
 }
 
-const char* sb_error(const sl_ctx_t* sb) {
+const c8* sb_error(const sl_ctx_t* sb) {
   if (!sb) return "null sandbox";
-  return sb->error[0] ? sb->error : NULL;
+  return sb->error[0] ? sb->error : SL_NULLPTR;
 }
 
 #endif
@@ -799,6 +810,7 @@ const char* sb_error(const sl_ctx_t* sb) {
 
 #include <dlfcn.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -832,62 +844,179 @@ static int sb_load_dylib(void) {
 
 /* --- profile generation ------------------------------------------------- */
 
-static char* build_profile(const sb_opts_t* opts) {
-  /*
-   * We build an SBPL profile string. Strategy:
-   *   - deny default
-   *   - allow process control (fork/exec/signal)
-   *   - allow reads to system paths (and optionally user-specified)
-   *   - deny reads to /Users
-   *   - allow writes only to opts->root and /dev
-   *   - optionally allow network
-   */
-  size_t cap = 2048;
-  char* p = sl_alloc(cap);
-  if (!p) return SL_NULLPTR;
+typedef struct {
+  c8* data;
+  u64 len;
+  u64 cap;
+} sl_profile_builder_t;
 
-  int off = 0;
+static bool sl_profile_reserve(sl_profile_builder_t* builder, u64 append_len) {
+  if (!builder) {
+    return false;
+  }
 
-  off += snprintf(p + off, cap - off,
-                  "(version 1)"
-                  "(deny default (with no-log))"
-                  "(allow process*)"
-                  "(allow sysctl-read)"
-                  "(allow mach*)"
-                  "(allow ipc*)"
-                  "(allow signal)");
+  u64 required = builder->len + append_len + 1;
+  if (required <= builder->cap) {
+    return true;
+  }
 
-  /* file reads: allow system, deny /Users */
-  off += snprintf(p + off, cap - off,
-                  "(allow file-read*)"
-                  "(deny file-read* (subpath \"/Users\"))");
+  u64 cap = builder->cap;
+  if (!cap) {
+    cap = 4096;
+  }
 
-  /* if any writable dir is under /Users, re-allow reads there */
-  for (u32 i = 0; i < opts->write.num_dirs; i++) {
-    if (strncmp(opts->write.dirs[i], "/Users", 6) == 0) {
-      off += snprintf(p + off, cap - off, "(allow file-read* (subpath \"%s\"))", opts->write.dirs[i]);
+  while (cap < required) {
+    if (cap > (UINT64_MAX / 2)) {
+      return false;
+    }
+    cap *= 2;
+  }
+
+  c8* next = sl_allocator_realloc(sl_rt.gpa, builder->data, cap);
+  if (!next) {
+    return false;
+  }
+
+  builder->data = next;
+  builder->cap = cap;
+  return true;
+}
+
+static bool sl_profile_append_n(sl_profile_builder_t* builder, const c8* value, u64 len) {
+  if (!len) {
+    return true;
+  }
+  if (!value) {
+    return false;
+  }
+  if (!sl_profile_reserve(builder, len)) {
+    return false;
+  }
+
+  memcpy(builder->data + builder->len, value, len);
+  builder->len += len;
+  builder->data[builder->len] = 0;
+  return true;
+}
+
+static bool sl_profile_append(sl_profile_builder_t* builder, const c8* value) {
+  if (!value) {
+    return false;
+  }
+  return sl_profile_append_n(builder, value, sl_cstr_len(value));
+}
+
+static bool sl_profile_append_ch(sl_profile_builder_t* builder, c8 ch) {
+  return sl_profile_append_n(builder, &ch, 1);
+}
+
+static bool sl_profile_append_escaped_path(sl_profile_builder_t* builder, const c8* path) {
+  if (!path || !path[0]) {
+    return false;
+  }
+
+  for (u32 it = 0; path[it]; it++) {
+    c8 ch = path[it];
+    if (ch == '\\' || ch == '"') {
+      if (!sl_profile_append_ch(builder, '\\')) {
+        return false;
+      }
+    }
+    if (!sl_profile_append_ch(builder, ch)) {
+      return false;
     }
   }
 
-  /* additional readable paths */
-  for (u32 i = 0; i < opts->read.num_dirs; i++) {
-    off += snprintf(p + off, cap - off, "(allow file-read* (subpath \"%s\"))", opts->read.dirs[i]);
+  return true;
+}
+
+static bool sl_profile_append_subpath(sl_profile_builder_t* builder, const c8* action, const c8* path) {
+  if (!action || !path || !path[0]) {
+    return false;
   }
 
-  /* file writes: only the writable dirs + /dev + /private/var (for tmp) */
-  for (u32 i = 0; i < opts->write.num_dirs; i++) {
-    off += snprintf(p + off, cap - off, "(allow file-write* (subpath \"%s\"))", opts->write.dirs[i]);
+  if (!sl_profile_append_ch(builder, '(')) {
+    return false;
   }
-  off += snprintf(p + off, cap - off,
-                  "(allow file-write* (subpath \"/dev\"))"
-                  "(allow file-write* (subpath \"/private/var/folders\"))");
+  if (!sl_profile_append(builder, action)) {
+    return false;
+  }
+  if (!sl_profile_append(builder, " (subpath \"")) {
+    return false;
+  }
+  if (!sl_profile_append_escaped_path(builder, path)) {
+    return false;
+  }
+  if (!sl_profile_append(builder, "\"))")) {
+    return false;
+  }
 
-  /* network */
+  return true;
+}
+
+static bool sl_profile_append_subpath_resolved(sl_profile_builder_t* builder, const c8* action, const c8* path) {
+  if (!sl_profile_append_subpath(builder, action, path)) {
+    return false;
+  }
+
+  c8 resolved[PATH_MAX] = SL_ZERO;
+  if (!realpath(path, resolved)) {
+    return true;
+  }
+  if (!strcmp(path, resolved)) {
+    return true;
+  }
+
+  return sl_profile_append_subpath(builder, action, resolved);
+}
+
+static c8* build_profile(const sb_opts_t* opts) {
+  if (!opts) {
+    return SL_NULLPTR;
+  }
+
+  sl_profile_builder_t profile = {
+    .data = sl_alloc_n(c8, 4096),
+    .cap = 4096,
+  };
+  if (!profile.data) {
+    return SL_NULLPTR;
+  }
+  profile.data[0] = 0;
+
+  if (!sl_profile_append(&profile, "(version 1)")) goto fail;
+  if (!sl_profile_append(&profile, "(deny default (with no-log))")) goto fail;
+  if (!sl_profile_append(&profile, "(allow process*)")) goto fail;
+  if (!sl_profile_append(&profile, "(allow sysctl-read)")) goto fail;
+  if (!sl_profile_append(&profile, "(allow mach*)")) goto fail;
+  if (!sl_profile_append(&profile, "(allow ipc*)")) goto fail;
+  if (!sl_profile_append(&profile, "(allow signal)")) goto fail;
+
+  if (!sl_profile_append(&profile, "(allow file-read*)")) goto fail;
+
+  sl_for(it, opts->read.num_dirs) {
+    if (!sl_profile_append_subpath_resolved(&profile, "allow file-read*", opts->read.dirs[it])) {
+      goto fail;
+    }
+  }
+
+  sl_for(it, opts->write.num_dirs) {
+    if (!sl_profile_append_subpath_resolved(&profile, "allow file-write*", opts->write.dirs[it])) {
+      goto fail;
+    }
+  }
+
+  if (!sl_profile_append_subpath(&profile, "allow file-write*", "/dev")) goto fail;
+
   if (opts->network) {
-    off += snprintf(p + off, cap - off, "(allow network*)");
+    if (!sl_profile_append(&profile, "(allow network*)")) goto fail;
   }
 
-  return p;
+  return profile.data;
+
+fail:
+  sl_free(profile.data);
+  return SL_NULLPTR;
 }
 
 /* --- public API --------------------------------------------------------- */
@@ -940,6 +1069,8 @@ sl_ctx_t* sb_create(const sb_opts_t* opts) {
       return SL_NULLPTR;
     }
   }
+
+  sb->network = opts->network;
 
   sb->platform.profile = build_profile(opts);
   if (!sb->platform.profile) {
@@ -1088,9 +1219,9 @@ void sb_destroy(sl_ctx_t* sb) {
   sl_free(sb);
 }
 
-const char* sb_error(const sl_ctx_t* sb) {
+const c8* sb_error(const sl_ctx_t* sb) {
   if (!sb) return "null sandbox";
-  return sb->error[0] ? sb->error : NULL;
+  return sb->error[0] ? sb->error : SL_NULLPTR;
 }
 
 #endif

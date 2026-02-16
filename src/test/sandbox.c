@@ -1,4 +1,5 @@
 #define SP_IMPLEMENTATION
+#define STEVELOCK_IMPLEMENTATION
 #include "sl.h"
 
 static sp_str_t sl_test_make_case_root(int* utest_result, const c8* name, c8* root_template, u32 root_template_size) {
