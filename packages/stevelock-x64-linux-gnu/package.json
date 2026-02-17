@@ -1,5 +1,5 @@
 {
-  "name": "@stevelock/stevelock-linux-x64-gnu",
+  "name": "@stevelock/stevelock-x64-linux-gnu",
   "version": "0.2.0",
   "os": [
     "linux"

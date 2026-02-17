@@ -81,10 +81,10 @@ jobs:
           git config user.email "toadie@boonbane.com"
 
           git add package.json
-          git add packages/stevelock-darwin-arm64-apple/package.json
-          git add packages/stevelock-darwin-x64-apple/package.json
-          git add packages/stevelock-linux-arm64-gnu/package.json
-          git add packages/stevelock-linux-x64-gnu/package.json
+          git add packages/stevelock-arm64-darwin-apple/package.json
+          git add packages/stevelock-x64-darwin-apple/package.json
+          git add packages/stevelock-arm64-linux-gnu/package.json
+          git add packages/stevelock-x64-linux-gnu/package.json
           git add example/local/package.json
           git add example/remote/package.json
 

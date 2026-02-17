@@ -11,11 +11,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - triple: linux-x64-gnu
+          - triple: x64-linux-gnu
             runner: ubuntu-24.04
-          - triple: linux-arm64-gnu
+          - triple: arm64-linux-gnu
             runner: ubuntu-24.04-arm
-          - triple: darwin-arm64-apple
+          - triple: arm64-darwin-apple
             runner: macos-26
 
     steps:
@@ -57,7 +57,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-${{ matrix.triple }}
-          path: .cache/store/release/stevelock-native-${{ matrix.triple }}.tar.gz
+          path: .cache/store/release/stevelock-${{ matrix.triple }}.tar.gz
           if-no-files-found: error
 
   build-header:
@@ -97,5 +97,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-header
-          path: .cache/store/release/stevelock-header.tar.gz
+          path: .cache/store/release/stevelock.h
           if-no-files-found: error

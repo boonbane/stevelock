@@ -8,10 +8,10 @@ namespace Version {
   const rootManifest = path.join(root, "package.json");
   const manifests = [
     rootManifest,
-    path.join(root, "packages", "stevelock-darwin-arm64-apple", "package.json"),
-    path.join(root, "packages", "stevelock-darwin-x64-apple", "package.json"),
-    path.join(root, "packages", "stevelock-linux-arm64-gnu", "package.json"),
-    path.join(root, "packages", "stevelock-linux-x64-gnu", "package.json"),
+    path.join(root, "packages", "stevelock-arm64-darwin-apple", "package.json"),
+    path.join(root, "packages", "stevelock-x64-darwin-apple", "package.json"),
+    path.join(root, "packages", "stevelock-arm64-linux-gnu", "package.json"),
+    path.join(root, "packages", "stevelock-x64-linux-gnu", "package.json"),
     path.join(root, "example", "local", "package.json"),
     path.join(root, "example", "remote", "package.json"),
   ] as const;

@@ -16,7 +16,7 @@ export namespace Platform {
     { os: "linux", arch: "x64", libc: "gnu" },
   ];
 
-  export const triple = (target: Target) => `${target.os}-${target.arch}-${target.libc}`;
+  export const triple = (target: Target) => `${target.arch}-${target.os}-${target.libc}`;
   export const packageName = (target: Target) => `@stevelock/stevelock-${triple(target)}`;
   export const packageDir = (target: Target) => `packages/stevelock-${triple(target)}`;
 

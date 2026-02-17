@@ -25,7 +25,7 @@
     "package:header": "bun run tools/release.ts package:header",
     "package:js": "bun run tools/release.ts package:js",
     "version:bump": "bun run tools/version.ts",
-    "act:native": "act workflow_dispatch -W .github/workflows/native-build.yml -j build-native --matrix triple:linux-x64-gnu -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 -P ubuntu-24.04-arm=catthehacker/ubuntu:act-24.04 -P macos-26=catthehacker/ubuntu:act-24.04 && act workflow_dispatch -W .github/workflows/native-build.yml -j build-header -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 -P ubuntu-24.04-arm=catthehacker/ubuntu:act-24.04 -P macos-26=catthehacker/ubuntu:act-24.04",
+    "act:native": "act workflow_dispatch -W .github/workflows/native-build.yml -j build-native --matrix triple:x64-linux-gnu -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 -P ubuntu-24.04-arm=catthehacker/ubuntu:act-24.04 -P macos-26=catthehacker/ubuntu:act-24.04 && act workflow_dispatch -W .github/workflows/native-build.yml -j build-header -P ubuntu-24.04=catthehacker/ubuntu:act-24.04 -P ubuntu-24.04-arm=catthehacker/ubuntu:act-24.04 -P macos-26=catthehacker/ubuntu:act-24.04",
     "publish": "bun run tools/publish.ts",
     "format": "bun run tools/format.ts",
     "smoke": "bun run example:local",
@@ -40,9 +40,9 @@
     "yargs": "^18.0.0"
   },
   "optionalDependencies": {
-    "@stevelock/stevelock-darwin-arm64-apple": "0.2.0",
-    "@stevelock/stevelock-darwin-x64-apple": "0.2.0",
-    "@stevelock/stevelock-linux-arm64-gnu": "0.2.0",
-    "@stevelock/stevelock-linux-x64-gnu": "0.2.0"
+    "@stevelock/stevelock-arm64-darwin-apple": "0.2.0",
+    "@stevelock/stevelock-arm64-linux-gnu": "0.2.0",
+    "@stevelock/stevelock-x64-darwin-apple": "0.2.0",
+    "@stevelock/stevelock-x64-linux-gnu": "0.2.0"
   }
 }

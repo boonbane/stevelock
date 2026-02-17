@@ -1,14 +1,11 @@
 {
-  "name": "@stevelock/stevelock-linux-arm64-gnu",
+  "name": "@stevelock/stevelock-arm64-darwin-apple",
   "version": "0.2.0",
   "os": [
-    "linux"
+    "darwin"
   ],
   "cpu": [
     "arm64"
-  ],
-  "libc": [
-    "glibc"
   ],
   "main": "stevelock.node",
   "files": [

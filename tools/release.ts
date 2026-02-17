@@ -38,8 +38,8 @@ const paths = {
     release: {
       dir: path.join(root, ".cache", "store", "release"),
       native: (target: Platform.Target) =>
-        path.join(root, ".cache", "store", "release", `stevelock-native-${Platform.triple(target)}.tar.gz`),
-      header: path.join(root, ".cache", "store", "release", "stevelock-header.tar.gz"),
+        path.join(root, ".cache", "store", "release", `stevelock-${Platform.triple(target)}.tar.gz`),
+      header: path.join(root, ".cache", "store", "release", "stevelock.h"),
     },
     tar: {
       dir: path.join(root, ".cache", "store", "stevelock"),
@@ -114,6 +114,12 @@ const packArchive = (cwd: string, out: string, entries: string[]) => {
   if (!result.success) {
     throw new Error(`tar exited with code ${result.exitCode}`);
   }
+};
+
+const copyFile = (src: string, out: string) => {
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  rm(out);
+  fs.copyFileSync(src, out);
 };
 
 const clean = () => {
@@ -244,11 +250,15 @@ const packageNative = () => {
   const target = Platform.detect();
   const triple = Platform.triple(target);
   const lib = path.join(paths.store.native.lib, "libstevelock.a");
+  const header = path.join(paths.store.native.include, "stevelock.h");
   if (!fs.existsSync(lib)) {
     throw new Error(`missing native library: ${lib}. run \`bun run build:native\` first`);
   }
+  if (!fs.existsSync(header)) {
+    throw new Error(`missing header: ${header}. run \`bun run build:native\` first`);
+  }
 
-  packArchive(paths.store.native.root, paths.store.release.native(target), ["lib/libstevelock.a"]);
+  packArchive(paths.store.native.root, paths.store.release.native(target), ["lib/libstevelock.a", "include/stevelock.h"]);
   console.log(`stored native release tarball (${triple}) -> ${paths.store.release.native(target)}`);
 };
 
@@ -258,8 +268,8 @@ const packageHeader = () => {
     throw new Error(`missing header: ${header}. run \`bun run build:native\` first`);
   }
 
-  packArchive(paths.store.native.root, paths.store.release.header, ["include/stevelock.h"]);
-  console.log(`stored header release tarball -> ${paths.store.release.header}`);
+  copyFile(header, paths.store.release.header);
+  console.log(`stored header release file -> ${paths.store.release.header}`);
 };
 
 const smoke = async () => {
