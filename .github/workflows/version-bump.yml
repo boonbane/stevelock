@@ -1,0 +1,102 @@
+name: version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Exact version (e.g. 0.2.0)"
+        required: false
+        type: string
+      bump:
+        description: "Or choose a bump"
+        required: false
+        default: "none"
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: read
+
+jobs:
+  bump-tag-push:
+    name: Bump, tag, and push
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ssh-key: ${{ secrets.CI_DEPLOY_KEY }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Configure push remote
+        run: git remote set-url origin "git@github.com:${GITHUB_REPOSITORY}.git"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Resolve bump input
+        id: pick
+        env:
+          INPUT_VERSION: ${{ github.event.inputs.version }}
+          INPUT_BUMP: ${{ github.event.inputs.bump }}
+        run: |
+          if [ -n "$INPUT_VERSION" ] && [ "$INPUT_BUMP" != "none" ]; then
+            echo "Choose either an exact version or a bump, not both."
+            exit 1
+          fi
+
+          if [ -n "$INPUT_VERSION" ]; then
+            echo "arg=$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$INPUT_BUMP" != "none" ]; then
+            echo "arg=$INPUT_BUMP" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Choose a version or a bump."
+          exit 1
+
+      - name: Bump version files
+        run: bun run version:bump "${{ steps.pick.outputs.arg }}"
+
+      - name: Read version
+        id: ver
+        run: echo "value=$(bun -e 'console.log((await Bun.file("package.json").json()).version)')" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and tag
+        env:
+          VERSION: ${{ steps.ver.outputs.value }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add package.json
+          git add packages/stevelock-darwin-arm64-apple/package.json
+          git add packages/stevelock-darwin-x64-apple/package.json
+          git add packages/stevelock-linux-arm64-gnu/package.json
+          git add packages/stevelock-linux-x64-gnu/package.json
+          git add example/local/package.json
+          git add example/remote/package.json
+
+          git commit -m "bot: bump version to $VERSION"
+
+          tag="v$VERSION"
+          git tag "$tag"
+
+      - name: Push commit and tag
+        env:
+          VERSION: ${{ steps.ver.outputs.value }}
+        run: |
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+          git push origin "v$VERSION"
