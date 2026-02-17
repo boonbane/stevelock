@@ -88,14 +88,7 @@ jobs:
           git add example/local/package.json
           git add example/remote/package.json
 
-          git commit -m "bot: bump version to $VERSION"
+          git commit -m "bot: v$VERSION"
 
-          tag="v$VERSION"
-          git tag "$tag"
-
-      - name: Push commit and tag
-        env:
-          VERSION: ${{ steps.ver.outputs.value }}
-        run: |
-          git push origin "HEAD:${GITHUB_REF_NAME}"
-          git push origin "v$VERSION"
+          git tag "v${VERSION}"
+          git push origin HEAD "v${VERSION}"
