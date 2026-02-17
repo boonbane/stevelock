@@ -1,6 +1,6 @@
 {
   "name": "stevelock",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "main": "src/index.ts",
   "files": [
@@ -40,9 +40,9 @@
     "yargs": "^18.0.0"
   },
   "optionalDependencies": {
-    "@stevelock/stevelock-darwin-arm64-apple": "0.1.0",
-    "@stevelock/stevelock-darwin-x64-apple": "0.1.0",
-    "@stevelock/stevelock-linux-arm64-gnu": "0.1.0",
-    "@stevelock/stevelock-linux-x64-gnu": "0.1.0"
+    "@stevelock/stevelock-darwin-arm64-apple": "0.2.0",
+    "@stevelock/stevelock-darwin-x64-apple": "0.2.0",
+    "@stevelock/stevelock-linux-arm64-gnu": "0.2.0",
+    "@stevelock/stevelock-linux-x64-gnu": "0.2.0"
   }
 }
