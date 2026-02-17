@@ -22,8 +22,8 @@ permissions:
   contents: read
 
 jobs:
-  bump-tag-push:
-    name: Bump, tag, and push
+  bump:
+    name: Bump version
     runs-on: ubuntu-24.04
 
     steps:
